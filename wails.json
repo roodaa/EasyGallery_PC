@@ -1,0 +1,24 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "EasyGallery",
+  "outputfilename": "EasyGallery",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Romaric Dacosse",
+    "email": "romaric.dacosse@etu.utc.fr"
+  },
+  "info": {
+    "companyName": "Personal Project",
+    "productName": "EasyGallery",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright 2025 Romaric Dacosse",
+    "comments": "Application de gestion de galerie photos avec système de tags"
+  },
+  "wails": {
+    "id": "com.romaric.easygallery",
+    "version": "2.11.0"
+  }
+}

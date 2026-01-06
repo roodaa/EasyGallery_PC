@@ -1,0 +1,53 @@
+# Binaries et builds
+build/bin/
+*.exe
+*.app
+*.dmg
+*.deb
+*.rpm
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+
+# Go
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Wails
+frontend/wailsjs/
+
+# Base de données et data (ne pas commit les données utilisateur)
+*.db
+*.db-shm
+*.db-wal
+data/
+thumbnails/
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS
+Thumbs.db
+desktop.ini
+
+# CV (fichier personnel)
+*.pdf
