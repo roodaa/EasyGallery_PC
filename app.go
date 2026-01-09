@@ -9,6 +9,8 @@ import (
 	"easygallery/backend/database"
 	"easygallery/backend/models"
 	"easygallery/backend/services"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App est la structure principale du backend
@@ -62,6 +64,13 @@ func (a *App) shutdown(ctx context.Context) {
 // Elle sera automatiquement exposée au frontend
 func (a *App) Greet(name string) string {
 	return fmt.Sprintf("Hello %s, welcome to EasyGallery!", name)
+}
+
+// SelectFolder ouvre un dialogue de sélection de dossier
+func (a *App) SelectFolder() (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select a folder to watch",
+	})
 }
 
 // IndexFolder indexe un dossier de photos
