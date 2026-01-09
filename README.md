@@ -2,23 +2,35 @@
 
 Une application desktop moderne pour organiser, taguer et rechercher vos photos avec une interface intuitive.
 
+> 🚧 **Projet en développement actif** - V1.0 en cours d'implémentation
+
 ## Description
 
 EasyGallery est une application de gestion de galerie photos qui permet de:
 - Scanner automatiquement les photos de votre ordinateur
+- Gérer plusieurs dossiers surveillés pour une indexation centralisée
 - Ajouter des tags personnalisés (personnes, lieux, événements, etc.)
-- Effectuer des recherches avancées avec opérateurs AND/OR
 - Parcourir vos photos avec une interface moderne et fluide
 
-### Fonctionnalités V1
+### Fonctionnalités Implémentées
 
-- ✅ Scan de dossiers photos avec gestion des permissions
+- ✅ Gestion des dossiers surveillés avec statistiques
+- ✅ Scan récursif de dossiers photos
+- ✅ Extraction automatique de métadonnées (dimensions, taille, dates)
+- ✅ Base de données SQLite avec GORM
 - ✅ Système de tags multi-types (personne, lieu, événement, autre)
-- ✅ Recherche avancée avec opérateurs booléens (AND/OR)
 - ✅ Galerie responsive avec vue en grille
-- ✅ Gestion des métadonnées EXIF
-- ✅ Génération automatique de thumbnails
+- ✅ Modal de détails de photo avec métadonnées complètes
+- ✅ Génération de thumbnails
 - ✅ Interface moderne avec React + TailwindCSS
+- ✅ Dialogue natif de sélection de dossier
+
+### Fonctionnalités à Venir
+
+- 🔄 Recherche avancée avec opérateurs booléens (AND/OR)
+- 🔄 Interface de gestion des tags
+- 🔄 Attribution de tags aux photos
+- 🔄 Amélioration de la génération de miniatures (resize réel)
 
 ### Fonctionnalités V2 (futures)
 
@@ -50,19 +62,18 @@ EasyGallery est une application de gestion de galerie photos qui permet de:
 
 ```
 EasyGallery_PC/
-├── backend/              # Backend Go
-│   ├── models/          # Modèles de données (Picture, Tag)
+├── app.go               # Application principale Wails
+├── main.go              # Point d'entrée
+├── backend/             # Backend Go
+│   ├── models/          # Modèles de données (Picture, Tag, WatchedFolder)
 │   ├── database/        # Configuration DB et migrations
-│   ├── services/        # Logique métier (scanner, search, CRUD)
-│   └── utils/           # Utilitaires (config, filesystem, images)
+│   └── services/        # Logique métier (indexer)
 ├── frontend/            # Frontend React
 │   └── src/
-│       ├── components/  # Composants UI
-│       ├── pages/       # Pages principales
-│       ├── hooks/       # Hooks personnalisés
-│       ├── types/       # Types TypeScript
-│       └── utils/       # Helpers frontend
-└── build/              # Configuration build par OS
+│       ├── components/  # Composants UI (WatchedFolders, PhotoGallery)
+│       ├── App.tsx      # Application principale avec navigation
+│       └── styles/      # Styles globaux TailwindCSS
+└── build/               # Exécutables compilés
 ```
 
 ## Schéma de Base de Données
@@ -83,20 +94,26 @@ EasyGallery_PC/
 - tag_name (FK → tags.name)
 - created_at
 
+### Table `watched_folders`
+- **path** (TEXT, PRIMARY KEY) - Chemin absolu du dossier
+- name (TEXT) - Nom convivial du dossier
+- added_at, last_indexed_at
+- picture_count (INTEGER) - Nombre de photos indexées
+- auto_reindex (BOOLEAN) - Ré-indexation automatique
+
 ## Données Utilisateur
 
-Les données sont stockées dans l'emplacement standard de chaque OS:
+Les données sont stockées dans le dossier utilisateur:
 
-- **Windows**: `%APPDATA%\EasyGallery\`
-- **macOS**: `~/Library/Application Support/EasyGallery/`
-- **Linux**: `~/.local/share/easygallery/`
+- **Windows**: `%USERPROFILE%\.easygallery\`
+- **macOS**: `~/.easygallery/`
+- **Linux**: `~/.easygallery/`
 
 Contenu:
 ```
-EasyGallery/
+.easygallery/
 ├── easygallery.db      # Base SQLite
-├── thumbnails/         # Cache des miniatures
-└── config.json         # Configuration (dossiers autorisés)
+└── thumbnails/         # Cache des miniatures
 ```
 
 ## Installation et Développement
@@ -157,25 +174,42 @@ Les exécutables sont générés dans le dossier `build/bin/`.
 
 ## Utilisation
 
-1. **Premier lancement**: Configurez les dossiers où EasyGallery peut rechercher des photos
-2. **Scanner**: Lancez un scan pour indexer vos photos
-3. **Taguer**: Ajoutez des tags à vos photos (personnes, lieux, événements)
-4. **Rechercher**: Utilisez la recherche avancée
-   - `Marie AND Paris` - Photos de Marie à Paris
-   - `Vacances OR Voyage` - Photos taguées Vacances ou Voyage
-   - `Jean AND (Paris OR Lyon)` - Photos de Jean à Paris ou Lyon
+### 1. Ajouter des Dossiers Surveillés
+- Cliquez sur l'onglet "Watched Folders" dans la sidebar
+- Cliquez sur "Add Folder" et sélectionnez un dossier contenant des photos
+- Donnez-lui un nom convivial (optionnel)
+
+### 2. Indexer les Photos
+- Cliquez sur "Index" pour un dossier spécifique
+- Ou cliquez sur "Reindex All" pour tous les dossiers
+- Les métadonnées (dimensions, taille, dates) sont extraites automatiquement
+
+### 3. Parcourir la Galerie
+- Cliquez sur l'onglet "Gallery" pour voir toutes vos photos indexées
+- Cliquez sur une photo pour voir ses détails complets
+- Les miniatures sont générées automatiquement
+
+### 4. Gestion (À venir)
+- Attribution de tags aux photos
+- Recherche avancée avec filtres
+- Timeline chronologique
 
 ## Roadmap
 
-### V1.0 (Actuel)
+### V1.0 (En cours)
 - [x] Architecture projet
-- [ ] Modèles et base de données
-- [ ] Scanner de fichiers
-- [ ] Interface galerie basique
-- [ ] Système de tags manuel
-- [ ] Recherche avancée
+- [x] Modèles et base de données (Picture, Tag, WatchedFolder, PictureTag)
+- [x] Scanner de fichiers avec extraction de métadonnées
+- [x] Interface galerie responsive avec grille et modal de détails
+- [x] Gestion des dossiers surveillés
+- [x] Génération de thumbnails (basique)
+- [ ] Interface de gestion des tags
+- [ ] Attribution de tags aux photos
+- [ ] Recherche avancée avec opérateurs booléens
 
 ### V1.5
+- [ ] Amélioration génération de miniatures (resize réel avec bibliothèque d'images)
+- [ ] Événements de progression pour l'indexation
 - [ ] Optimisation performances (pagination, lazy loading)
 - [ ] Export de sélections
 - [ ] Import/Export de tags
@@ -183,7 +217,7 @@ Les exécutables sont générés dans le dossier `build/bin/`.
 
 ### V2.0
 - [ ] Reconnaissance faciale (ML Kit ou équivalent)
-- [ ] Détection automatique de lieux
+- [ ] Détection automatique de lieux via GPS EXIF
 - [ ] Timeline chronologique
 - [ ] Version web démo
 
