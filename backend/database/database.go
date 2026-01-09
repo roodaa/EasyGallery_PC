@@ -43,6 +43,7 @@ func Init(dataDir string) error {
 		&models.Picture{},
 		&models.Tag{},
 		&models.PictureTag{},
+		&models.WatchedFolder{},
 	); err != nil {
 		return fmt.Errorf("failed to migrate database: %w", err)
 	}

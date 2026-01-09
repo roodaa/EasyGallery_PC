@@ -97,3 +97,61 @@ func (a *App) GetPictureCount() (int64, error) {
 
 	return a.indexer.GetPictureCount()
 }
+
+// === Gestion des dossiers surveillés ===
+
+// AddWatchedFolder ajoute un dossier à la liste des dossiers surveillés
+func (a *App) AddWatchedFolder(folderPath string, name string, autoReindex bool) error {
+	if a.indexer == nil {
+		return fmt.Errorf("indexer not initialized")
+	}
+
+	return a.indexer.AddWatchedFolder(folderPath, name, autoReindex)
+}
+
+// RemoveWatchedFolder retire un dossier de la liste des dossiers surveillés
+func (a *App) RemoveWatchedFolder(folderPath string) error {
+	if a.indexer == nil {
+		return fmt.Errorf("indexer not initialized")
+	}
+
+	return a.indexer.RemoveWatchedFolder(folderPath)
+}
+
+// GetWatchedFolders retourne tous les dossiers surveillés
+func (a *App) GetWatchedFolders() ([]models.WatchedFolder, error) {
+	if a.indexer == nil {
+		return nil, fmt.Errorf("indexer not initialized")
+	}
+
+	return a.indexer.GetWatchedFolders()
+}
+
+// UpdateWatchedFolder met à jour les métadonnées d'un dossier surveillé
+func (a *App) UpdateWatchedFolder(folderPath string, name string, autoReindex bool) error {
+	if a.indexer == nil {
+		return fmt.Errorf("indexer not initialized")
+	}
+
+	return a.indexer.UpdateWatchedFolder(folderPath, name, autoReindex)
+}
+
+// IndexWatchedFolder indexe un dossier surveillé spécifique
+func (a *App) IndexWatchedFolder(folderPath string) (int, error) {
+	if a.indexer == nil {
+		return 0, fmt.Errorf("indexer not initialized")
+	}
+
+	// TODO: Émettre des événements de progression vers le frontend
+	return a.indexer.IndexWatchedFolder(folderPath, nil)
+}
+
+// ReindexAllWatchedFolders ré-indexe tous les dossiers surveillés
+func (a *App) ReindexAllWatchedFolders() (int, error) {
+	if a.indexer == nil {
+		return 0, fmt.Errorf("indexer not initialized")
+	}
+
+	// TODO: Émettre des événements de progression vers le frontend
+	return a.indexer.ReindexAllWatchedFolders(nil)
+}

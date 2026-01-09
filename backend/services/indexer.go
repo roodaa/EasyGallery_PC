@@ -237,3 +237,130 @@ func (idx *Indexer) GetPictureCount() (int64, error) {
 	}
 	return count, nil
 }
+
+// === Gestion des dossiers surveillés ===
+
+// AddWatchedFolder ajoute un dossier à la liste des dossiers surveillés
+func (idx *Indexer) AddWatchedFolder(folderPath string, name string, autoReindex bool) error {
+	// Vérifier que le dossier existe
+	info, err := os.Stat(folderPath)
+	if err != nil {
+		return fmt.Errorf("folder not found: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("path is not a directory: %s", folderPath)
+	}
+
+	// Convertir en chemin absolu
+	absPath, err := filepath.Abs(folderPath)
+	if err != nil {
+		return fmt.Errorf("cannot get absolute path: %w", err)
+	}
+
+	// Si le nom n'est pas fourni, utiliser le nom du dossier
+	if name == "" {
+		name = filepath.Base(absPath)
+	}
+
+	// Créer l'entrée dans la DB
+	watchedFolder := models.WatchedFolder{
+		Path:        absPath,
+		Name:        name,
+		AutoReindex: autoReindex,
+	}
+
+	// Upsert
+	if err := database.DB.Save(&watchedFolder).Error; err != nil {
+		return fmt.Errorf("cannot save watched folder: %w", err)
+	}
+
+	return nil
+}
+
+// RemoveWatchedFolder retire un dossier de la liste des dossiers surveillés
+func (idx *Indexer) RemoveWatchedFolder(folderPath string) error {
+	result := database.DB.Delete(&models.WatchedFolder{}, "path = ?", folderPath)
+	if result.Error != nil {
+		return fmt.Errorf("cannot delete watched folder: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("watched folder not found: %s", folderPath)
+	}
+	return nil
+}
+
+// GetWatchedFolders retourne tous les dossiers surveillés
+func (idx *Indexer) GetWatchedFolders() ([]models.WatchedFolder, error) {
+	var folders []models.WatchedFolder
+	if err := database.DB.Find(&folders).Error; err != nil {
+		return nil, err
+	}
+	return folders, nil
+}
+
+// UpdateWatchedFolder met à jour les métadonnées d'un dossier surveillé
+func (idx *Indexer) UpdateWatchedFolder(folderPath string, name string, autoReindex bool) error {
+	var folder models.WatchedFolder
+	if err := database.DB.Where("path = ?", folderPath).First(&folder).Error; err != nil {
+		return fmt.Errorf("watched folder not found: %w", err)
+	}
+
+	folder.Name = name
+	folder.AutoReindex = autoReindex
+
+	if err := database.DB.Save(&folder).Error; err != nil {
+		return fmt.Errorf("cannot update watched folder: %w", err)
+	}
+
+	return nil
+}
+
+// IndexWatchedFolder indexe un dossier surveillé et met à jour ses statistiques
+func (idx *Indexer) IndexWatchedFolder(folderPath string, onProgress func(current, total int, filename string)) (int, error) {
+	// Vérifier que le dossier est bien surveillé
+	var folder models.WatchedFolder
+	if err := database.DB.Where("path = ?", folderPath).First(&folder).Error; err != nil {
+		return 0, fmt.Errorf("watched folder not found: %w", err)
+	}
+
+	// Indexer le dossier
+	count, err := idx.IndexFolder(folderPath, onProgress)
+	if err != nil {
+		return 0, err
+	}
+
+	// Mettre à jour les statistiques
+	folder.LastIndexedAt = time.Now()
+	folder.PictureCount = count
+
+	if err := database.DB.Save(&folder).Error; err != nil {
+		return count, fmt.Errorf("indexed %d pictures but failed to update stats: %w", count, err)
+	}
+
+	return count, nil
+}
+
+// ReindexAllWatchedFolders ré-indexe tous les dossiers surveillés
+func (idx *Indexer) ReindexAllWatchedFolders(onProgress func(folderName string, current, total int)) (int, error) {
+	folders, err := idx.GetWatchedFolders()
+	if err != nil {
+		return 0, err
+	}
+
+	totalIndexed := 0
+	for _, folder := range folders {
+		if onProgress != nil {
+			onProgress(folder.Name, 0, 0)
+		}
+
+		count, err := idx.IndexWatchedFolder(folder.Path, nil)
+		if err != nil {
+			fmt.Printf("Warning: failed to index folder %s: %v\n", folder.Path, err)
+			continue
+		}
+
+		totalIndexed += count
+	}
+
+	return totalIndexed, nil
+}
