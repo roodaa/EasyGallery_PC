@@ -1,12 +1,17 @@
-import { useState, useEffect } from 'react'
-import { GetIndexedPictures, GetPictureCount } from '../../wailsjs/go/main/App'
-import { models } from '../../wailsjs/go/models'
+import { useState, useEffect, useCallback } from 'react'
+import { GetIndexedPictures, GetPictureCount, SearchPicturesAdvanced } from '../../wailsjs/go/main/App'
+import { models, services } from '../../wailsjs/go/models'
+import ImageViewer from './ImageViewer'
+import SearchBar from './SearchBar'
+import { getImageUrl } from '../utils/imageUrl'
 
 export default function PhotoGallery() {
-  const [pictures, setPictures] = useState<models.Picture[]>([])
+  const [allPictures, setAllPictures] = useState<models.Picture[]>([])
+  const [displayedPictures, setDisplayedPictures] = useState<models.Picture[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [selectedPicture, setSelectedPicture] = useState<models.Picture | null>(null)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const [isFiltered, setIsFiltered] = useState(false)
 
   useEffect(() => {
     loadPictures()
@@ -17,7 +22,10 @@ export default function PhotoGallery() {
     try {
       setLoading(true)
       const result = await GetIndexedPictures()
-      setPictures(result || [])
+      const pictures = result || []
+      setAllPictures(pictures)
+      setDisplayedPictures(pictures)
+      setIsFiltered(false)
     } catch (error) {
       console.error('Failed to load pictures:', error)
     } finally {
@@ -34,16 +42,22 @@ export default function PhotoGallery() {
     }
   }
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
+  // Recherche par tags
+  const handleSearch = useCallback(async (criteria: services.SearchCriteria) => {
+    try {
+      const result = await SearchPicturesAdvanced(criteria)
+      setDisplayedPictures(result || [])
+      setIsFiltered(true)
+    } catch (error) {
+      console.error('Search failed:', error)
+    }
+  }, [])
 
-  const formatDate = (date: any) => {
-    if (!date) return 'Unknown'
-    return new Date(date).toLocaleDateString()
-  }
+  // Effacer le filtre
+  const handleClearSearch = useCallback(() => {
+    setDisplayedPictures(allPictures)
+    setIsFiltered(false)
+  }, [allPictures])
 
   if (loading) {
     return (
@@ -59,7 +73,11 @@ export default function PhotoGallery() {
         <h2 className="text-2xl font-bold text-white">
           Photo Gallery
           <span className="ml-3 text-gray-400 text-lg font-normal">
-            ({totalCount} {totalCount === 1 ? 'picture' : 'pictures'})
+            {isFiltered ? (
+              <>{displayedPictures.length} / {totalCount} photos</>
+            ) : (
+              <>({totalCount} {totalCount === 1 ? 'photo' : 'photos'})</>
+            )}
           </span>
         </h2>
         <button
@@ -70,22 +88,30 @@ export default function PhotoGallery() {
         </button>
       </div>
 
-      {pictures.length === 0 ? (
+      {/* Barre de recherche */}
+      <SearchBar onSearch={handleSearch} onClear={handleClearSearch} />
+
+      {allPictures.length === 0 ? (
         <div className="text-center py-12 bg-gray-800 rounded-lg">
           <p className="text-gray-400 text-lg">No pictures indexed yet</p>
           <p className="text-gray-500 text-sm mt-2">Add and index a folder to see your photos here</p>
         </div>
+      ) : displayedPictures.length === 0 ? (
+        <div className="text-center py-12 bg-gray-800 rounded-lg">
+          <p className="text-gray-400 text-lg">Aucune photo ne correspond aux criteres</p>
+          <p className="text-gray-500 text-sm mt-2">Modifiez vos filtres ou effacez la recherche</p>
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {pictures.map((picture) => (
+            {displayedPictures.map((picture, index) => (
               <div
                 key={picture.path}
-                onClick={() => setSelectedPicture(picture)}
+                onClick={() => setSelectedIndex(index)}
                 className="group relative aspect-square bg-gray-800 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
               >
                 <img
-                  src={`file://${picture.path}`}
+                  src={getImageUrl(picture.path)}
                   alt={picture.filename}
                   className="w-full h-full object-cover"
                   onError={(e) => {
@@ -102,81 +128,19 @@ export default function PhotoGallery() {
             ))}
           </div>
 
-          {/* Modal de détails de la photo */}
-          {selectedPicture && (
-            <div
-              className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-8 z-50"
-              onClick={() => setSelectedPicture(null)}
-            >
-              <div
-                className="bg-gray-800 rounded-lg max-w-4xl w-full max-h-full overflow-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6 space-y-4">
-                  <div className="flex items-start justify-between">
-                    <h3 className="text-2xl font-bold text-white">{selectedPicture.filename}</h3>
-                    <button
-                      onClick={() => setSelectedPicture(null)}
-                      className="text-gray-400 hover:text-white text-2xl"
-                    >
-                      ×
-                    </button>
-                  </div>
-
-                  <div className="bg-gray-900 rounded-lg p-4">
-                    <img
-                      src={`file://${selectedPicture.path}`}
-                      alt={selectedPicture.filename}
-                      className="w-full h-auto max-h-96 object-contain"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-400">Path:</span>
-                      <p className="text-white font-mono text-xs mt-1 break-all">{selectedPicture.path}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Size:</span>
-                      <p className="text-white mt-1">{formatFileSize(selectedPicture.size)}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Dimensions:</span>
-                      <p className="text-white mt-1">{selectedPicture.width} × {selectedPicture.height}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Created:</span>
-                      <p className="text-white mt-1">{formatDate(selectedPicture.createdAt)}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Modified:</span>
-                      <p className="text-white mt-1">{formatDate(selectedPicture.modifiedAt)}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Indexed:</span>
-                      <p className="text-white mt-1">{formatDate(selectedPicture.indexedAt)}</p>
-                    </div>
-                  </div>
-
-                  {selectedPicture.tags && selectedPicture.tags.length > 0 && (
-                    <div>
-                      <span className="text-gray-400 text-sm">Tags:</span>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {selectedPicture.tags.map((tag) => (
-                          <span
-                            key={tag.name}
-                            className="px-3 py-1 rounded-full text-sm"
-                            style={{ backgroundColor: tag.color || '#3B82F6' }}
-                          >
-                            {tag.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+          {/* Image viewer */}
+          {selectedIndex !== null && (
+            <ImageViewer
+              pictures={displayedPictures}
+              initialIndex={selectedIndex}
+              onClose={() => setSelectedIndex(null)}
+              onDelete={(deletedPath) => {
+                // Remove the deleted picture from local state
+                setAllPictures((prev) => prev.filter((p) => p.path !== deletedPath))
+                setDisplayedPictures((prev) => prev.filter((p) => p.path !== deletedPath))
+                setTotalCount((prev) => prev - 1)
+              }}
+            />
           )}
         </>
       )}

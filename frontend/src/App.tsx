@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import WatchedFolders from './components/WatchedFolders'
 import PhotoGallery from './components/PhotoGallery'
+import TagManager from './components/TagManager'
 
 type View = 'gallery' | 'folders' | 'tags'
 
@@ -72,11 +73,7 @@ function App() {
         <div className="p-8">
           {currentView === 'gallery' && <PhotoGallery />}
           {currentView === 'folders' && <WatchedFolders />}
-          {currentView === 'tags' && (
-            <div className="text-center py-12">
-              <p className="text-gray-400 text-lg">Tags management coming soon...</p>
-            </div>
-          )}
+          {currentView === 'tags' && <TagManager />}
         </div>
       </div>
     </div>

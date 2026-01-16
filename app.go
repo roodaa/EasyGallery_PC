@@ -16,9 +16,10 @@ import (
 // App est la structure principale du backend
 // Toutes ses méthodes publiques sont accessibles depuis React
 type App struct {
-	ctx     context.Context
-	indexer *services.Indexer
-	dataDir string
+	ctx        context.Context
+	indexer    *services.Indexer
+	tagService *services.TagService
+	dataDir    string
 }
 
 // NewApp crée une nouvelle instance de App
@@ -43,11 +44,13 @@ func (a *App) startup(ctx context.Context) {
 	// Initialiser la base de données
 	if err := database.Init(a.dataDir); err != nil {
 		fmt.Printf("Error initializing database: %v\n", err)
-		// Note: En production, on pourrait vouloir afficher une erreur à l'utilisateur
+		// Ne pas initialiser l'indexer si la DB a échoué
+		return
 	}
 
-	// Initialiser l'indexer
+	// Initialiser les services seulement si la DB est prête
 	a.indexer = services.NewIndexer(a.dataDir)
+	a.tagService = services.NewTagService()
 }
 
 // shutdown est appelé à la fermeture de l'application
@@ -107,6 +110,15 @@ func (a *App) GetPictureCount() (int64, error) {
 	return a.indexer.GetPictureCount()
 }
 
+// DeletePicture supprime une photo de l'index et optionnellement du disque
+func (a *App) DeletePicture(picturePath string, deleteFromDisk bool) error {
+	if a.indexer == nil {
+		return fmt.Errorf("indexer not initialized")
+	}
+
+	return a.indexer.DeletePicture(picturePath, deleteFromDisk)
+}
+
 // === Gestion des dossiers surveillés ===
 
 // AddWatchedFolder ajoute un dossier à la liste des dossiers surveillés
@@ -163,4 +175,88 @@ func (a *App) ReindexAllWatchedFolders() (int, error) {
 
 	// TODO: Émettre des événements de progression vers le frontend
 	return a.indexer.ReindexAllWatchedFolders(nil)
+}
+
+// === Gestion des tags ===
+
+// CreateTag crée un nouveau tag
+func (a *App) CreateTag(name string, tagType string, color string) error {
+	if a.tagService == nil {
+		return fmt.Errorf("tag service not initialized")
+	}
+
+	return a.tagService.CreateTag(name, models.TagType(tagType), color)
+}
+
+// GetAllTags retourne tous les tags
+func (a *App) GetAllTags() ([]models.Tag, error) {
+	if a.tagService == nil {
+		return nil, fmt.Errorf("tag service not initialized")
+	}
+
+	return a.tagService.GetAllTags()
+}
+
+// GetAllTagsWithCount retourne tous les tags avec leur nombre de photos
+func (a *App) GetAllTagsWithCount() ([]services.TagWithCount, error) {
+	if a.tagService == nil {
+		return nil, fmt.Errorf("tag service not initialized")
+	}
+
+	return a.tagService.GetAllTagsWithCount()
+}
+
+// UpdateTag met à jour un tag existant
+func (a *App) UpdateTag(name string, tagType string, color string) error {
+	if a.tagService == nil {
+		return fmt.Errorf("tag service not initialized")
+	}
+
+	return a.tagService.UpdateTag(name, models.TagType(tagType), color)
+}
+
+// DeleteTag supprime un tag et toutes ses associations
+func (a *App) DeleteTag(name string) error {
+	if a.tagService == nil {
+		return fmt.Errorf("tag service not initialized")
+	}
+
+	return a.tagService.DeleteTag(name)
+}
+
+// AddTagToPicture associe un tag à une photo
+func (a *App) AddTagToPicture(picturePath string, tagName string) error {
+	if a.tagService == nil {
+		return fmt.Errorf("tag service not initialized")
+	}
+
+	return a.tagService.AddTagToPicture(picturePath, tagName)
+}
+
+// RemoveTagFromPicture dissocie un tag d'une photo
+func (a *App) RemoveTagFromPicture(picturePath string, tagName string) error {
+	if a.tagService == nil {
+		return fmt.Errorf("tag service not initialized")
+	}
+
+	return a.tagService.RemoveTagFromPicture(picturePath, tagName)
+}
+
+// GetTagsForPicture retourne tous les tags d'une photo
+func (a *App) GetTagsForPicture(picturePath string) ([]models.Tag, error) {
+	if a.tagService == nil {
+		return nil, fmt.Errorf("tag service not initialized")
+	}
+
+	return a.tagService.GetTagsForPicture(picturePath)
+}
+
+// SearchPicturesAdvanced effectue une recherche avancée par tags
+// Exemple: (Clara AND Romaric) AND (Paris OR Compiegne)
+func (a *App) SearchPicturesAdvanced(criteria services.SearchCriteria) ([]models.Picture, error) {
+	if a.tagService == nil {
+		return nil, fmt.Errorf("tag service not initialized")
+	}
+
+	return a.tagService.SearchPicturesAdvanced(criteria)
 }

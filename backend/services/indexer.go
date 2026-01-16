@@ -28,6 +28,14 @@ func NewIndexer(dataDir string) *Indexer {
 	}
 }
 
+// checkDB vérifie si la base de données est initialisée
+func checkDB() error {
+	if database.DB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	return nil
+}
+
 // SupportedExtensions liste des extensions d'images supportées
 var SupportedExtensions = []string{".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
 
@@ -94,6 +102,10 @@ func (idx *Indexer) IndexFolder(folderPath string, onProgress func(current, tota
 
 // indexImage indexe une seule image
 func (idx *Indexer) indexImage(imagePath string) error {
+	if err := checkDB(); err != nil {
+		return err
+	}
+
 	// Vérifier si l'image existe déjà dans la DB
 	var existingPicture models.Picture
 	result := database.DB.Where("path = ?", imagePath).First(&existingPicture)
@@ -222,6 +234,10 @@ func (idx *Indexer) generateThumbnail(imagePath string) (string, error) {
 
 // GetIndexedPictures retourne toutes les photos indexées
 func (idx *Indexer) GetIndexedPictures() ([]models.Picture, error) {
+	if err := checkDB(); err != nil {
+		return nil, err
+	}
+
 	var pictures []models.Picture
 	if err := database.DB.Find(&pictures).Error; err != nil {
 		return nil, err
@@ -231,6 +247,10 @@ func (idx *Indexer) GetIndexedPictures() ([]models.Picture, error) {
 
 // GetPictureCount retourne le nombre de photos indexées
 func (idx *Indexer) GetPictureCount() (int64, error) {
+	if err := checkDB(); err != nil {
+		return 0, err
+	}
+
 	var count int64
 	if err := database.DB.Model(&models.Picture{}).Count(&count).Error; err != nil {
 		return 0, err
@@ -238,10 +258,39 @@ func (idx *Indexer) GetPictureCount() (int64, error) {
 	return count, nil
 }
 
+// DeletePicture supprime une photo de l'index et optionnellement du disque
+func (idx *Indexer) DeletePicture(picturePath string, deleteFromDisk bool) error {
+	if err := checkDB(); err != nil {
+		return err
+	}
+
+	// Supprimer de la base de données
+	result := database.DB.Delete(&models.Picture{}, "path = ?", picturePath)
+	if result.Error != nil {
+		return fmt.Errorf("cannot delete picture from database: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("picture not found in database: %s", picturePath)
+	}
+
+	// Supprimer du disque si demandé
+	if deleteFromDisk {
+		if err := os.Remove(picturePath); err != nil {
+			return fmt.Errorf("deleted from database but failed to delete file: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // === Gestion des dossiers surveillés ===
 
 // AddWatchedFolder ajoute un dossier à la liste des dossiers surveillés
 func (idx *Indexer) AddWatchedFolder(folderPath string, name string, autoReindex bool) error {
+	if err := checkDB(); err != nil {
+		return err
+	}
+
 	// Vérifier que le dossier existe
 	info, err := os.Stat(folderPath)
 	if err != nil {
@@ -279,6 +328,10 @@ func (idx *Indexer) AddWatchedFolder(folderPath string, name string, autoReindex
 
 // RemoveWatchedFolder retire un dossier de la liste des dossiers surveillés
 func (idx *Indexer) RemoveWatchedFolder(folderPath string) error {
+	if err := checkDB(); err != nil {
+		return err
+	}
+
 	result := database.DB.Delete(&models.WatchedFolder{}, "path = ?", folderPath)
 	if result.Error != nil {
 		return fmt.Errorf("cannot delete watched folder: %w", result.Error)
@@ -291,6 +344,10 @@ func (idx *Indexer) RemoveWatchedFolder(folderPath string) error {
 
 // GetWatchedFolders retourne tous les dossiers surveillés
 func (idx *Indexer) GetWatchedFolders() ([]models.WatchedFolder, error) {
+	if err := checkDB(); err != nil {
+		return nil, err
+	}
+
 	var folders []models.WatchedFolder
 	if err := database.DB.Find(&folders).Error; err != nil {
 		return nil, err
@@ -300,6 +357,10 @@ func (idx *Indexer) GetWatchedFolders() ([]models.WatchedFolder, error) {
 
 // UpdateWatchedFolder met à jour les métadonnées d'un dossier surveillé
 func (idx *Indexer) UpdateWatchedFolder(folderPath string, name string, autoReindex bool) error {
+	if err := checkDB(); err != nil {
+		return err
+	}
+
 	var folder models.WatchedFolder
 	if err := database.DB.Where("path = ?", folderPath).First(&folder).Error; err != nil {
 		return fmt.Errorf("watched folder not found: %w", err)
@@ -317,6 +378,10 @@ func (idx *Indexer) UpdateWatchedFolder(folderPath string, name string, autoRein
 
 // IndexWatchedFolder indexe un dossier surveillé et met à jour ses statistiques
 func (idx *Indexer) IndexWatchedFolder(folderPath string, onProgress func(current, total int, filename string)) (int, error) {
+	if err := checkDB(); err != nil {
+		return 0, err
+	}
+
 	// Vérifier que le dossier est bien surveillé
 	var folder models.WatchedFolder
 	if err := database.DB.Where("path = ?", folderPath).First(&folder).Error; err != nil {

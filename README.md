@@ -2,7 +2,7 @@
 
 Une application desktop moderne pour organiser, taguer et rechercher vos photos avec une interface intuitive.
 
-> 🚧 **Projet en développement actif** - V1.0 en cours d'implémentation
+> ✅ **V1.0 Terminee** - Gestion des tags et recherche avancee implementees
 
 ## Description
 
@@ -17,19 +17,21 @@ EasyGallery est une application de gestion de galerie photos qui permet de:
 - ✅ Gestion des dossiers surveillés avec statistiques
 - ✅ Scan récursif de dossiers photos
 - ✅ Extraction automatique de métadonnées (dimensions, taille, dates)
-- ✅ Base de données SQLite avec GORM
+- ✅ Base de données SQLite avec GORM (driver pur Go, sans CGO)
 - ✅ Système de tags multi-types (personne, lieu, événement, autre)
 - ✅ Galerie responsive avec vue en grille
-- ✅ Modal de détails de photo avec métadonnées complètes
+- ✅ **Visionneuse d'images plein écran** avec navigation et panneau d'infos
+- ✅ **Suppression de photos** (de l'index ou du disque)
 - ✅ Génération de thumbnails
 - ✅ Interface moderne avec React + TailwindCSS
 - ✅ Dialogue natif de sélection de dossier
+- ✅ Raccourcis clavier (navigation, suppression, toggle info)
+- ✅ **Interface de gestion des tags** avec palette de couleurs et types
+- ✅ **Attribution de tags aux photos** depuis la visionneuse
+- ✅ **Recherche avancée** avec opérateurs booléens par type de tag
 
 ### Fonctionnalités à Venir
 
-- 🔄 Recherche avancée avec opérateurs booléens (AND/OR)
-- 🔄 Interface de gestion des tags
-- 🔄 Attribution de tags aux photos
 - 🔄 Amélioration de la génération de miniatures (resize réel)
 
 ### Fonctionnalités V2 (futures)
@@ -58,19 +60,64 @@ EasyGallery est une application de gestion de galerie photos qui permet de:
 - Exécutables natifs et légers
 - Communication bidirectionnelle Go ↔ React
 
+## Notes Techniques
+
+### Middleware de Fichiers Locaux
+
+Les applications Wails utilisent une WebView pour le rendu du frontend. Pour des raisons de sécurité, le protocole `file://` est bloqué par défaut, ce qui empêche le chargement direct des images locales.
+
+**Solution implémentée**: Un middleware HTTP personnalisé intercepte les requêtes vers `/localfile/` et sert les fichiers du système de fichiers local.
+
+```go
+// main.go - LocalFileMiddleware
+func LocalFileMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        if strings.HasPrefix(r.URL.Path, "/localfile/") {
+            filePath := strings.TrimPrefix(r.URL.Path, "/localfile/")
+            http.ServeFile(w, r, filePath)
+            return
+        }
+        next.ServeHTTP(w, r)
+    })
+}
+```
+
+**Utilisation côté frontend**:
+```typescript
+// utils/imageUrl.ts
+export function getImageUrl(filePath: string): string {
+  const encodedPath = filePath.replace(/\\/g, '/')
+  return `/localfile/${encodedPath}`
+}
+
+// Utilisation
+<img src={getImageUrl(picture.path)} />
+```
+
+### Driver SQLite sans CGO
+
+Le projet utilise `github.com/glebarez/sqlite` au lieu de `gorm.io/driver/sqlite` standard. Ce driver est une implémentation pure Go de SQLite qui ne nécessite pas CGO ni de compilateur C, ce qui simplifie la compilation sur Windows.
+
 ## Architecture
 
 ```
 EasyGallery_PC/
-├── app.go               # Application principale Wails
+├── app.go               # Application principale Wails (endpoints API)
 ├── main.go              # Point d'entrée
 ├── backend/             # Backend Go
 │   ├── models/          # Modèles de données (Picture, Tag, WatchedFolder)
 │   ├── database/        # Configuration DB et migrations
-│   └── services/        # Logique métier (indexer)
+│   └── services/        # Logique métier
+│       ├── indexer.go   # Indexation des photos
+│       └── tag_service.go # Gestion des tags et recherche
 ├── frontend/            # Frontend React
 │   └── src/
-│       ├── components/  # Composants UI (WatchedFolders, PhotoGallery)
+│       ├── components/
+│       │   ├── PhotoGallery.tsx  # Galerie avec recherche
+│       │   ├── ImageViewer.tsx   # Visionneuse plein écran
+│       │   ├── WatchedFolders.tsx # Gestion des dossiers
+│       │   ├── TagManager.tsx    # Gestion des tags
+│       │   └── SearchBar.tsx     # Recherche avancée
 │       ├── App.tsx      # Application principale avec navigation
 │       └── styles/      # Styles globaux TailwindCSS
 └── build/               # Exécutables compilés
@@ -189,23 +236,38 @@ Les exécutables sont générés dans le dossier `build/bin/`.
 - Cliquez sur une photo pour voir ses détails complets
 - Les miniatures sont générées automatiquement
 
-### 4. Gestion (À venir)
-- Attribution de tags aux photos
-- Recherche avancée avec filtres
-- Timeline chronologique
+### 4. Gestion des Tags
+- Cliquez sur l'onglet "Tags" dans la sidebar
+- Cliquez sur "Nouveau Tag" pour créer un tag
+- Choisissez un type (Personne, Lieu, Evenement, Autre) et une couleur
+- Modifiez ou supprimez des tags existants
+
+### 5. Attribution de Tags aux Photos
+- Ouvrez une photo dans la visionneuse (clic sur une image)
+- Dans le panneau d'infos (touche `I`), section "Tags"
+- Cliquez sur `+` pour ajouter un tag depuis la liste
+- Cliquez sur `x` sur un tag pour le retirer de la photo
+
+### 6. Recherche Avancee
+- Dans la galerie, cliquez sur "Recherche par tags"
+- Selectionnez des tags par type (Personnes, Lieux, Evenements, Autres)
+- Choisissez l'operateur interne (AND/OR) pour chaque groupe
+- Les groupes sont combines avec AND entre eux
+- Exemple: `(Clara AND Romaric) AND (Paris OR Compiegne)`
+- Le filtrage s'applique en temps reel
 
 ## Roadmap
 
-### V1.0 (En cours)
+### V1.0 (Termine)
 - [x] Architecture projet
-- [x] Modèles et base de données (Picture, Tag, WatchedFolder, PictureTag)
-- [x] Scanner de fichiers avec extraction de métadonnées
-- [x] Interface galerie responsive avec grille et modal de détails
-- [x] Gestion des dossiers surveillés
-- [x] Génération de thumbnails (basique)
-- [ ] Interface de gestion des tags
-- [ ] Attribution de tags aux photos
-- [ ] Recherche avancée avec opérateurs booléens
+- [x] Modeles et base de donnees (Picture, Tag, WatchedFolder, PictureTag)
+- [x] Scanner de fichiers avec extraction de metadonnees
+- [x] Interface galerie responsive avec grille et modal de details
+- [x] Gestion des dossiers surveilles
+- [x] Generation de thumbnails (basique)
+- [x] Interface de gestion des tags (CRUD avec types et couleurs)
+- [x] Attribution de tags aux photos (depuis la visionneuse)
+- [x] Recherche avancee avec operateurs booleens par type
 
 ### V1.5
 - [ ] Amélioration génération de miniatures (resize réel avec bibliothèque d'images)
